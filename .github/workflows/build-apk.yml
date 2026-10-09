@@ -1,0 +1,80 @@
+name: Build APK (Debug + Release)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.24.0'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # ============================
+      # BUILD DEBUG APK
+      # ============================
+      - name: Build APK Debug
+        run: flutter build apk --debug
+
+      - name: Rename Debug APK
+        run: |
+          mkdir -p output
+          cp build/app/outputs/flutter-apk/app-debug.apk output/app-debug.apk
+
+      # ============================
+      # BUILD RELEASE APK
+      # ============================
+      - name: Build APK Release
+        run: flutter build apk --release
+
+      - name: Rename Release APK
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk output/app-release.apk
+
+      # ============================
+      # UPLOAD KEDUA APK
+      # ============================
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: output/app-debug.apk
+          retention-days: 7
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: output/app-release.apk
+          retention-days: 7
+
+      # ============================
+      # OPTIONAL: Upload ke Release biar bisa di-download tanpa login
+      # ============================
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build #${{ github.run_number }}
+          files: |
+            output/app-debug.apk
+            output/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
